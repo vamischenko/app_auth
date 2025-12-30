@@ -12,10 +12,18 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules;
 use Illuminate\View\View;
 
+/**
+ * Контроллер регистрации пользователей
+ *
+ * Обрабатывает процесс регистрации новых пользователей в системе,
+ * включая валидацию данных, создание учетной записи и автоматический вход.
+ */
 class RegisteredUserController extends Controller
 {
     /**
-     * Display the registration view.
+     * Отображает страницу регистрации
+     *
+     * @return View Представление формы регистрации
      */
     public function create(): View
     {
@@ -23,9 +31,15 @@ class RegisteredUserController extends Controller
     }
 
     /**
-     * Handle an incoming registration request.
+     * Обрабатывает запрос на регистрацию нового пользователя
      *
-     * @throws \Illuminate\Validation\ValidationException
+     * Валидирует входные данные, создает нового пользователя с хешированным паролем,
+     * генерирует событие Registered для отправки email верификации и выполняет
+     * автоматический вход в систему.
+     *
+     * @param Request $request HTTP запрос с данными регистрации
+     * @return RedirectResponse Перенаправление на dashboard
+     * @throws \Illuminate\Validation\ValidationException Если валидация не прошла
      */
     public function store(Request $request): RedirectResponse
     {

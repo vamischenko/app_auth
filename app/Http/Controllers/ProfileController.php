@@ -9,10 +9,18 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\View\View;
 
+/**
+ * Контроллер управления профилем пользователя
+ *
+ * Обрабатывает операции редактирования, обновления и удаления профиля пользователя.
+ */
 class ProfileController extends Controller
 {
     /**
-     * Display the user's profile form.
+     * Отображает форму редактирования профиля пользователя
+     *
+     * @param Request $request HTTP запрос
+     * @return View Представление с формой редактирования профиля
      */
     public function edit(Request $request): View
     {
@@ -22,7 +30,12 @@ class ProfileController extends Controller
     }
 
     /**
-     * Update the user's profile information.
+     * Обновляет информацию профиля пользователя
+     *
+     * При изменении email адреса сбрасывает статус верификации email.
+     *
+     * @param ProfileUpdateRequest $request Валидированный запрос с данными профиля
+     * @return RedirectResponse Перенаправление на страницу редактирования профиля
      */
     public function update(ProfileUpdateRequest $request): RedirectResponse
     {
@@ -38,7 +51,13 @@ class ProfileController extends Controller
     }
 
     /**
-     * Delete the user's account.
+     * Удаляет учетную запись пользователя
+     *
+     * Требует подтверждения текущего пароля. После удаления выполняется выход
+     * из системы, аннулирование сессии и регенерация CSRF токена.
+     *
+     * @param Request $request HTTP запрос
+     * @return RedirectResponse Перенаправление на главную страницу
      */
     public function destroy(Request $request): RedirectResponse
     {

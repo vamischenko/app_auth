@@ -9,10 +9,19 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
+/**
+ * Контроллер подтверждения пароля
+ *
+ * Обрабатывает подтверждение пароля пользователя для доступа к защищенным
+ * операциям (например, изменение настроек безопасности, удаление аккаунта).
+ * Подтверждение действительно в течение определенного времени.
+ */
 class ConfirmablePasswordController extends Controller
 {
     /**
-     * Show the confirm password view.
+     * Отображает форму подтверждения пароля
+     *
+     * @return View Представление формы подтверждения пароля
      */
     public function show(): View
     {
@@ -20,7 +29,14 @@ class ConfirmablePasswordController extends Controller
     }
 
     /**
-     * Confirm the user's password.
+     * Проверяет и подтверждает пароль пользователя
+     *
+     * Проверяет соответствие введенного пароля текущему паролю пользователя.
+     * При успешной проверке сохраняет время подтверждения в сессии.
+     *
+     * @param Request $request HTTP запрос с паролем
+     * @return RedirectResponse Перенаправление на предполагаемую страницу или dashboard
+     * @throws ValidationException Если пароль неверен
      */
     public function store(Request $request): RedirectResponse
     {

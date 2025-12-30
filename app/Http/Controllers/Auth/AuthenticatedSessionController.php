@@ -9,10 +9,18 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
+/**
+ * Контроллер управления аутентифицированными сеансами
+ *
+ * Обрабатывает вход пользователей в систему, включая проверку двухфакторной
+ * аутентификации, и выход из системы с полной очисткой сессии.
+ */
 class AuthenticatedSessionController extends Controller
 {
     /**
-     * Display the login view.
+     * Отображает страницу входа в систему
+     *
+     * @return View Представление формы входа
      */
     public function create(): View
     {
@@ -20,7 +28,15 @@ class AuthenticatedSessionController extends Controller
     }
 
     /**
-     * Handle an incoming authentication request.
+     * Обрабатывает запрос на аутентификацию пользователя
+     *
+     * Выполняет аутентификацию пользователя. Если у пользователя включена
+     * двухфакторная аутентификация, выполняет выход и перенаправляет на страницу
+     * ввода 2FA кода. В противном случае регенерирует сессию и перенаправляет
+     * на предполагаемую страницу или на dashboard.
+     *
+     * @param LoginRequest $request Валидированный запрос на вход
+     * @return RedirectResponse Перенаправление на страницу 2FA или dashboard
      */
     public function store(LoginRequest $request): RedirectResponse
     {
@@ -44,7 +60,13 @@ class AuthenticatedSessionController extends Controller
     }
 
     /**
-     * Destroy an authenticated session.
+     * Завершает аутентифицированный сеанс пользователя
+     *
+     * Выполняет выход из системы, аннулирует текущую сессию и регенерирует
+     * CSRF токен для предотвращения повторного использования сессии.
+     *
+     * @param Request $request HTTP запрос
+     * @return RedirectResponse Перенаправление на главную страницу
      */
     public function destroy(Request $request): RedirectResponse
     {

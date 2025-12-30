@@ -10,8 +10,20 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
 
+/**
+ * Контроллер OAuth аутентификации через социальные сети
+ *
+ * Обрабатывает аутентификацию пользователей через внешние OAuth провайдеры:
+ * Google, GitHub, Facebook, ВКонтакте, Яндекс и Mail.ru.
+ * Автоматически создает новых пользователей или связывает существующие учетные записи.
+ */
 class SocialAuthController extends Controller
 {
+    /**
+     * Список поддерживаемых OAuth провайдеров
+     *
+     * @var array<int, string>
+     */
     protected array $providers = [
         'google',
         'github',
@@ -21,6 +33,12 @@ class SocialAuthController extends Controller
         'mailru',
     ];
 
+    /**
+     * Перенаправляет пользователя на страницу аутентификации провайдера
+     *
+     * @param string $provider Название OAuth провайдера
+     * @return \Symfony\Component\HttpFoundation\RedirectResponse Перенаправление на OAuth провайдера
+     */
     public function redirect(string $provider)
     {
         if (!in_array($provider, $this->providers)) {
@@ -30,6 +48,17 @@ class SocialAuthController extends Controller
         return Socialite::driver($provider)->redirect();
     }
 
+    /**
+     * Обрабатывает callback от OAuth провайдера
+     *
+     * Получает данные пользователя от провайдера и выполняет одно из действий:
+     * 1. Обновляет токены существующего OAuth пользователя
+     * 2. Связывает OAuth с существующей учетной записью по email
+     * 3. Создает новую учетную запись с автоматической верификацией email
+     *
+     * @param string $provider Название OAuth провайдера
+     * @return \Illuminate\Http\RedirectResponse Перенаправление на dashboard или страницу входа при ошибке
+     */
     public function callback(string $provider)
     {
         if (!in_array($provider, $this->providers)) {

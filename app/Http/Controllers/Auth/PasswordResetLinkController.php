@@ -8,10 +8,18 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Password;
 use Illuminate\View\View;
 
+/**
+ * Контроллер запроса ссылки для сброса пароля
+ *
+ * Обрабатывает запросы на отправку ссылки для сброса пароля на email пользователя.
+ * Ссылка содержит временный токен для верификации при сбросе пароля.
+ */
 class PasswordResetLinkController extends Controller
 {
     /**
-     * Display the password reset link request view.
+     * Отображает форму запроса ссылки для сброса пароля
+     *
+     * @return View Представление формы "Забыли пароль?"
      */
     public function create(): View
     {
@@ -19,9 +27,14 @@ class PasswordResetLinkController extends Controller
     }
 
     /**
-     * Handle an incoming password reset link request.
+     * Обрабатывает запрос на отправку ссылки для сброса пароля
      *
-     * @throws \Illuminate\Validation\ValidationException
+     * Отправляет email со ссылкой для сброса пароля на указанный адрес.
+     * Проверяет наличие пользователя с таким email в базе данных.
+     *
+     * @param Request $request HTTP запрос с email адресом
+     * @return RedirectResponse Перенаправление назад с сообщением об успехе или ошибке
+     * @throws \Illuminate\Validation\ValidationException Если email не валиден
      */
     public function store(Request $request): RedirectResponse
     {

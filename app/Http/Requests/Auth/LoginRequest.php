@@ -9,10 +9,18 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
+/**
+ * Запрос на вход в систему
+ *
+ * Обрабатывает валидацию и аутентификацию пользователя при входе.
+ * Включает защиту от брутфорса с ограничением количества попыток входа (5 попыток).
+ */
 class LoginRequest extends FormRequest
 {
     /**
-     * Determine if the user is authorized to make this request.
+     * Определяет, авторизован ли пользователь для выполнения этого запроса
+     *
+     * @return bool Всегда возвращает true, так как запрос доступен всем
      */
     public function authorize(): bool
     {
@@ -20,7 +28,11 @@ class LoginRequest extends FormRequest
     }
 
     /**
-     * Get the validation rules that apply to the request.
+     * Возвращает правила валидации для запроса
+     *
+     * Правила валидации:
+     * - email: обязательное поле, строка, валидный email
+     * - password: обязательное поле, строка
      *
      * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
      */
@@ -33,9 +45,14 @@ class LoginRequest extends FormRequest
     }
 
     /**
-     * Attempt to authenticate the request's credentials.
+     * Выполняет попытку аутентификации с учетными данными из запроса
      *
-     * @throws \Illuminate\Validation\ValidationException
+     * Проверяет ограничение количества попыток, затем пытается аутентифицировать пользователя.
+     * При неудачной попытке увеличивает счетчик попыток входа.
+     * При успешной аутентификации очищает счетчик попыток.
+     *
+     * @return void
+     * @throws \Illuminate\Validation\ValidationException Если аутентификация не удалась
      */
     public function authenticate(): void
     {
@@ -53,9 +70,14 @@ class LoginRequest extends FormRequest
     }
 
     /**
-     * Ensure the login request is not rate limited.
+     * Проверяет, что запрос на вход не ограничен по количеству попыток
      *
-     * @throws \Illuminate\Validation\ValidationException
+     * Разрешено максимум 5 попыток входа. При превышении лимита
+     * генерируется событие Lockout и выбрасывается исключение с указанием
+     * времени ожидания до следующей попытки.
+     *
+     * @return void
+     * @throws \Illuminate\Validation\ValidationException Если превышен лимит попыток
      */
     public function ensureIsNotRateLimited(): void
     {
@@ -76,7 +98,12 @@ class LoginRequest extends FormRequest
     }
 
     /**
-     * Get the rate limiting throttle key for the request.
+     * Возвращает ключ для ограничения частоты запросов
+     *
+     * Ключ формируется из email адреса (в нижнем регистре и транслитерированного)
+     * и IP адреса пользователя для уникальной идентификации попыток входа.
+     *
+     * @return string Уникальный ключ для throttling
      */
     public function throttleKey(): string
     {

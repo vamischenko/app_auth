@@ -13,10 +13,19 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rules;
 use Illuminate\View\View;
 
+/**
+ * Контроллер установки нового пароля
+ *
+ * Обрабатывает процесс сброса пароля по ссылке из email.
+ * Проверяет токен сброса, валидирует новый пароль и обновляет его в базе данных.
+ */
 class NewPasswordController extends Controller
 {
     /**
-     * Display the password reset view.
+     * Отображает форму установки нового пароля
+     *
+     * @param Request $request HTTP запрос с токеном и email из ссылки
+     * @return View Представление формы сброса пароля
      */
     public function create(Request $request): View
     {
@@ -24,9 +33,14 @@ class NewPasswordController extends Controller
     }
 
     /**
-     * Handle an incoming new password request.
+     * Обрабатывает запрос на установку нового пароля
      *
-     * @throws \Illuminate\Validation\ValidationException
+     * Проверяет валидность токена сброса, обновляет пароль пользователя,
+     * генерирует новый remember_token и отправляет событие PasswordReset.
+     *
+     * @param Request $request HTTP запрос с токеном, email и новым паролем
+     * @return RedirectResponse Перенаправление на страницу входа при успехе или назад с ошибками
+     * @throws \Illuminate\Validation\ValidationException Если валидация не прошла
      */
     public function store(Request $request): RedirectResponse
     {

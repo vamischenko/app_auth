@@ -7,15 +7,38 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use PragmaRX\Google2FA\Google2FA;
 
+/**
+ * Контроллер двухфакторной аутентификации (2FA)
+ *
+ * Управляет настройкой, включением, отключением и верификацией двухфакторной
+ * аутентификации через Google Authenticator. Поддерживает коды восстановления
+ * для доступа при потере устройства с 2FA.
+ */
 class TwoFactorController extends Controller
 {
+    /**
+     * Экземпляр Google2FA для генерации и верификации кодов
+     *
+     * @var Google2FA
+     */
     protected Google2FA $google2fa;
 
+    /**
+     * Инициализирует контроллер и создает экземпляр Google2FA
+     */
     public function __construct()
     {
         $this->google2fa = new Google2FA();
     }
 
+    /**
+     * Отображает форму для включения 2FA
+     *
+     * Генерирует секретный ключ и QR-код для сканирования в Google Authenticator.
+     * Если 2FA уже включена, перенаправляет на dashboard.
+     *
+     * @return \Illuminate\Http\RedirectResponse|\Illuminate\View\View
+     */
     public function showEnableForm()
     {
         $user = Auth::user();
@@ -39,6 +62,15 @@ class TwoFactorController extends Controller
         ]);
     }
 
+    /**
+     * Включает двухфакторную аутентификацию для пользователя
+     *
+     * Проверяет введенный код для подтверждения настройки 2FA, генерирует
+     * коды восстановления и сохраняет настройки в базе данных.
+     *
+     * @param Request $request HTTP запрос с кодом подтверждения
+     * @return \Illuminate\Http\RedirectResponse|\Illuminate\View\View
+     */
     public function enable(Request $request)
     {
         $request->validate([
@@ -73,6 +105,15 @@ class TwoFactorController extends Controller
         ]);
     }
 
+    /**
+     * Отключает двухфакторную аутентификацию
+     *
+     * Требует подтверждения текущего пароля. Удаляет секретный ключ
+     * и коды восстановления из базы данных.
+     *
+     * @param Request $request HTTP запрос с текущим паролем
+     * @return \Illuminate\Http\RedirectResponse Перенаправление на dashboard
+     */
     public function disable(Request $request)
     {
         $request->validate([
@@ -90,6 +131,13 @@ class TwoFactorController extends Controller
         return redirect()->route('dashboard')->with('status', '2FA has been disabled.');
     }
 
+    /**
+     * Отображает форму ввода 2FA кода при входе
+     *
+     * Доступна только если в сессии установлен флаг 2fa_required.
+     *
+     * @return \Illuminate\Http\RedirectResponse|\Illuminate\View\View
+     */
     public function showChallengeForm()
     {
         if (!session('2fa_required')) {
@@ -99,6 +147,15 @@ class TwoFactorController extends Controller
         return view('auth.two-factor.challenge');
     }
 
+    /**
+     * Проверяет 2FA код при входе в систему
+     *
+     * Принимает либо 6-значный код из Google Authenticator, либо код восстановления.
+     * При успешной проверке выполняет вход пользователя в систему.
+     *
+     * @param Request $request HTTP запрос с 2FA кодом
+     * @return \Illuminate\Http\RedirectResponse Перенаправление на dashboard или назад с ошибкой
+     */
     public function verify(Request $request)
     {
         $request->validate([
@@ -125,6 +182,13 @@ class TwoFactorController extends Controller
         return redirect()->intended('/dashboard');
     }
 
+    /**
+     * Генерирует коды восстановления для 2FA
+     *
+     * Создает 8 случайных 8-символьных шестнадцатеричных кодов в верхнем регистре.
+     *
+     * @return array<int, string> Массив кодов восстановления
+     */
     protected function generateRecoveryCodes(): array
     {
         $codes = [];
@@ -134,6 +198,16 @@ class TwoFactorController extends Controller
         return $codes;
     }
 
+    /**
+     * Проверяет код восстановления и удаляет его при успехе
+     *
+     * Ищет код в массиве кодов восстановления пользователя.
+     * При нахождении удаляет использованный код из базы данных.
+     *
+     * @param \App\Models\User $user Пользователь
+     * @param string $code Код восстановления
+     * @return bool True, если код валиден и не был использован
+     */
     protected function verifyRecoveryCode($user, $code): bool
     {
         $recoveryCodes = $user->google2fa_recovery_codes;
