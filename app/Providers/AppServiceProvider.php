@@ -2,6 +2,12 @@
 
 namespace App\Providers;
 
+use App\Events\PasswordChanged;
+use App\Events\SuspiciousLogin;
+use App\Events\TwoFactorDisabled;
+use App\Events\TwoFactorEnabled;
+use App\Listeners\LogSecurityEvent;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use SocialiteProviders\Manager\SocialiteWasCalled;
 
@@ -30,20 +36,27 @@ class AppServiceProvider extends ServiceProvider
     /**
      * Выполняет начальную загрузку сервисов приложения
      *
-     * Регистрирует обработчик события SocialiteWasCalled для расширения
-     * Laravel Socialite дополнительными OAuth провайдерами:
-     * - vkontakte - ВКонтакте
-     * - yandex - Яндекс
-     * - mailru - Mail.ru
+     * Регистрирует обработчики событий:
+     * - Расширяет Laravel Socialite дополнительными OAuth провайдерами
+     *   (ВКонтакте, Яндекс, Mail.ru)
+     * - Регистрирует слушатели событий безопасности для логирования
+     *   критических действий (2FA, изменение пароля, подозрительные входы)
      *
      * @return void
      */
     public function boot(): void
     {
-        \Event::listen(function (SocialiteWasCalled $event) {
+        // Регистрация дополнительных OAuth провайдеров
+        Event::listen(function (SocialiteWasCalled $event) {
             $event->extendSocialite('vkontakte', \SocialiteProviders\VKontakte\Provider::class);
             $event->extendSocialite('yandex', \SocialiteProviders\Yandex\Provider::class);
             $event->extendSocialite('mailru', \SocialiteProviders\MailRu\Provider::class);
         });
+
+        // Регистрация слушателей событий безопасности
+        Event::listen(TwoFactorEnabled::class, [LogSecurityEvent::class, 'handleTwoFactorEnabled']);
+        Event::listen(TwoFactorDisabled::class, [LogSecurityEvent::class, 'handleTwoFactorDisabled']);
+        Event::listen(PasswordChanged::class, [LogSecurityEvent::class, 'handlePasswordChanged']);
+        Event::listen(SuspiciousLogin::class, [LogSecurityEvent::class, 'handleSuspiciousLogin']);
     }
 }

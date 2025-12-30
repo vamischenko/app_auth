@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Events\TwoFactorDisabled;
+use App\Events\TwoFactorEnabled;
 use App\Http\Controllers\Controller;
+use App\Services\TwoFactorAuthService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use PragmaRX\Google2FA\Google2FA;
 
 /**
  * Контроллер двухфакторной аутентификации (2FA)
@@ -17,18 +19,20 @@ use PragmaRX\Google2FA\Google2FA;
 class TwoFactorController extends Controller
 {
     /**
-     * Экземпляр Google2FA для генерации и верификации кодов
+     * Сервис для работы с двухфакторной аутентификацией
      *
-     * @var Google2FA
+     * @var TwoFactorAuthService
      */
-    protected Google2FA $google2fa;
+    protected TwoFactorAuthService $twoFactorService;
 
     /**
-     * Инициализирует контроллер и создает экземпляр Google2FA
+     * Инициализирует контроллер и внедряет сервис 2FA
+     *
+     * @param TwoFactorAuthService $twoFactorService Сервис 2FA
      */
-    public function __construct()
+    public function __construct(TwoFactorAuthService $twoFactorService)
     {
-        $this->google2fa = new Google2FA();
+        $this->twoFactorService = $twoFactorService;
     }
 
     /**
@@ -43,14 +47,14 @@ class TwoFactorController extends Controller
     {
         $user = Auth::user();
 
-        if ($user->google2fa_enabled) {
+        if ($this->twoFactorService->isTwoFactorEnabled($user)) {
             return redirect()->route('dashboard')->with('error', '2FA is already enabled.');
         }
 
-        $secret = $this->google2fa->generateSecretKey();
+        $secret = $this->twoFactorService->generateSecret();
         session(['2fa_secret' => $secret]);
 
-        $qrCodeUrl = $this->google2fa->getQRCodeUrl(
+        $qrCodeUrl = $this->twoFactorService->getQRCodeUrl(
             config('app.name'),
             $user->email,
             $secret
@@ -84,21 +88,19 @@ class TwoFactorController extends Controller
             return redirect()->route('2fa.enable')->with('error', 'Please scan the QR code first.');
         }
 
-        $valid = $this->google2fa->verifyKey($secret, $request->code);
+        $valid = $this->twoFactorService->verifyCode($secret, $request->code);
 
         if (!$valid) {
             return redirect()->back()->withErrors(['code' => 'Invalid authentication code.']);
         }
 
-        $recoveryCodes = $this->generateRecoveryCodes();
-
-        $user->update([
-            'google2fa_enabled' => true,
-            'google2fa_secret' => $secret,
-            'google2fa_recovery_codes' => $recoveryCodes,
-        ]);
+        $recoveryCodes = $this->twoFactorService->generateRecoveryCodes();
+        $this->twoFactorService->enableTwoFactor($user, $secret, $recoveryCodes);
 
         session()->forget('2fa_secret');
+
+        // Генерируем событие включения 2FA
+        event(new TwoFactorEnabled($user, $request->ip(), $request->userAgent()));
 
         return view('auth.two-factor.recovery-codes', [
             'recoveryCodes' => $recoveryCodes,
@@ -121,12 +123,10 @@ class TwoFactorController extends Controller
         ]);
 
         $user = Auth::user();
+        $this->twoFactorService->disableTwoFactor($user);
 
-        $user->update([
-            'google2fa_enabled' => false,
-            'google2fa_secret' => null,
-            'google2fa_recovery_codes' => null,
-        ]);
+        // Генерируем событие отключения 2FA
+        event(new TwoFactorDisabled($user, $request->ip(), $request->userAgent()));
 
         return redirect()->route('dashboard')->with('status', '2FA has been disabled.');
     }
@@ -166,9 +166,9 @@ class TwoFactorController extends Controller
         $user = \App\Models\User::findOrFail($userId);
 
         if (strlen($request->code) === 6) {
-            $valid = $this->google2fa->verifyKey($user->google2fa_secret, $request->code);
+            $valid = $this->twoFactorService->verifyCode($user->google2fa_secret, $request->code);
         } else {
-            $valid = $this->verifyRecoveryCode($user, $request->code);
+            $valid = $this->twoFactorService->verifyAndConsumeRecoveryCode($user, $request->code);
         }
 
         if (!$valid) {
@@ -182,48 +182,4 @@ class TwoFactorController extends Controller
         return redirect()->intended('/dashboard');
     }
 
-    /**
-     * Генерирует коды восстановления для 2FA
-     *
-     * Создает 8 случайных 8-символьных шестнадцатеричных кодов в верхнем регистре.
-     *
-     * @return array<int, string> Массив кодов восстановления
-     */
-    protected function generateRecoveryCodes(): array
-    {
-        $codes = [];
-        for ($i = 0; $i < 8; $i++) {
-            $codes[] = strtoupper(bin2hex(random_bytes(4)));
-        }
-        return $codes;
-    }
-
-    /**
-     * Проверяет код восстановления и удаляет его при успехе
-     *
-     * Ищет код в массиве кодов восстановления пользователя.
-     * При нахождении удаляет использованный код из базы данных.
-     *
-     * @param \App\Models\User $user Пользователь
-     * @param string $code Код восстановления
-     * @return bool True, если код валиден и не был использован
-     */
-    protected function verifyRecoveryCode($user, $code): bool
-    {
-        $recoveryCodes = $user->google2fa_recovery_codes;
-
-        if (!$recoveryCodes) {
-            return false;
-        }
-
-        $key = array_search(strtoupper($code), $recoveryCodes);
-
-        if ($key !== false) {
-            unset($recoveryCodes[$key]);
-            $user->update(['google2fa_recovery_codes' => array_values($recoveryCodes)]);
-            return true;
-        }
-
-        return false;
-    }
 }

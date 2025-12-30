@@ -8,6 +8,8 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Контроллер аутентификации через магические ссылки
@@ -34,15 +36,30 @@ class MagicLinkController extends Controller
      * Проверяет существование пользователя, удаляет старые неиспользованные ссылки,
      * создает новую магическую ссылку и отправляет её на email.
      * Для безопасности возвращает одинаковый ответ независимо от существования пользователя.
+     * Ограничено 3 попытками в 5 минут для предотвращения спама.
      *
      * @param Request $request HTTP запрос с email адресом
      * @return \Illuminate\Http\RedirectResponse Перенаправление с сообщением об отправке
+     * @throws ValidationException Если превышен лимит попыток
      */
     public function sendMagicLink(Request $request)
     {
         $request->validate([
             'email' => 'required|email',
         ]);
+
+        // Rate limiting: максимум 3 попытки за 5 минут
+        $key = 'send-magic-link:' . $request->ip();
+
+        if (RateLimiter::tooManyAttempts($key, 3)) {
+            $seconds = RateLimiter::availableIn($key);
+
+            throw ValidationException::withMessages([
+                'email' => "Слишком много попыток. Пожалуйста, попробуйте через " . ceil($seconds / 60) . " минут.",
+            ]);
+        }
+
+        RateLimiter::hit($key, 300); // 5 минут
 
         $user = User::where('email', $request->email)->first();
 

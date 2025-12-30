@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 
 /**
  * Контроллер отправки уведомления о верификации email
@@ -19,6 +20,7 @@ class EmailVerificationNotificationController extends Controller
      *
      * Проверяет, не подтвержден ли уже email. Если нет - отправляет новое
      * письмо с ссылкой для верификации.
+     * Ограничено 2 попытками в минуту для предотвращения спама.
      *
      * @param Request $request HTTP запрос
      * @return RedirectResponse Перенаправление на dashboard если email подтвержден, или назад с сообщением
@@ -28,6 +30,19 @@ class EmailVerificationNotificationController extends Controller
         if ($request->user()->hasVerifiedEmail()) {
             return redirect()->intended(route('dashboard', absolute: false));
         }
+
+        // Rate limiting: максимум 2 попытки в минуту
+        $key = 'send-verification:' . $request->user()->id;
+
+        if (RateLimiter::tooManyAttempts($key, 2)) {
+            $seconds = RateLimiter::availableIn($key);
+
+            return back()->withErrors([
+                'email' => "Слишком много попыток. Пожалуйста, подождите {$seconds} секунд.",
+            ]);
+        }
+
+        RateLimiter::hit($key, 60); // 1 минута
 
         $request->user()->sendEmailVerificationNotification();
 
